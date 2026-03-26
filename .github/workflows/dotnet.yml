@@ -9,6 +9,11 @@ on:
 permissions:
   contents: write
 
+env:
+  Project_Path: WinFormsApp1/QA_Camera_Auto_Label.csproj
+  Publish_Dir: publish
+  Release_Zip: QA_Camera_Auto_Label-win-x64.zip
+
 jobs:
   build:
     runs-on: windows-latest
@@ -23,37 +28,39 @@ jobs:
           dotnet-version: 8.0.x
 
       - name: Restore
-        run: dotnet restore "WinFormsApp1/QA_Camera_Auto_Label.csproj"
+        run: dotnet restore "${{ env.Project_Path }}"
 
       - name: Publish
         run: >
-          dotnet publish "WinFormsApp1/QA_Camera_Auto_Label.csproj"
+          dotnet publish "${{ env.Project_Path }}"
           -c Release
           -r win-x64
           --self-contained true
           /p:PublishSingleFile=true
           /p:IncludeNativeLibrariesForSelfExtract=true
-          -o publish
+          -o "${{ env.Publish_Dir }}"
 
       - name: Copy model files
         shell: pwsh
         run: |
           if (Test-Path "WinFormsApp1\Models") {
-            New-Item -ItemType Directory -Force -Path "publish\Models" | Out-Null
-            Copy-Item "WinFormsApp1\Models\*" "publish\Models" -Recurse -Force
+            New-Item -ItemType Directory -Force -Path "${{ env.Publish_Dir }}\Models" | Out-Null
+            Copy-Item "WinFormsApp1\Models\*" "${{ env.Publish_Dir }}\Models" -Recurse -Force
           }
 
-      - name: Zip output
-        run: Compress-Archive -Path publish\* -DestinationPath app.zip -Force
+      - name: Create release zip
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: Compress-Archive -Path "${{ env.Publish_Dir }}\*" -DestinationPath "${{ env.Release_Zip }}" -Force
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app
-          path: app.zip
+          name: QA_Camera_Auto_Label-win-x64
+          path: ${{ env.Publish_Dir }}
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: app.zip
+          files: ${{ env.Release_Zip }}
