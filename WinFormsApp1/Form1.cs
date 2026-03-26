@@ -22,6 +22,16 @@ namespace QA_Camera_Auto_Label
         private Mat? lastFrame;
         private Yolo? detector;
 
+        private float GetConfidenceThreshold()
+        {
+            return (float)nudConfidence.Value;
+        }
+
+        private float GetIouThreshold()
+        {
+            return (float)nudIou.Value;
+        }
+
         public Form1()
         {
             InitializeComponent();
@@ -150,10 +160,13 @@ namespace QA_Camera_Auto_Label
             using var bmp = BitmapConverter.ToBitmap(lastFrame);
             using var skBitmap = BitmapToSkBitmap(bmp);
 
-            var results = detector.RunObjectDetection(skBitmap, confidence: 0.7f, iou: 0.9f);
+            float confidenceThreshold = GetConfidenceThreshold();
+            float iouThreshold = GetIouThreshold();
+
+            var results = detector.RunObjectDetection(skBitmap, confidence: confidenceThreshold, iou: iouThreshold);
 
             var detectedClasses = results
-                .Where(r => r.Confidence > 0.35)
+                .Where(r => r.Confidence >= confidenceThreshold)
                 .Select(r => r.Label.Name)
                 .Distinct()
                 .Take(4)
@@ -184,7 +197,9 @@ namespace QA_Camera_Auto_Label
 
             using var displayMat = originalFrame.Clone();
 
-            foreach (var det in detections.Where(d => d.Confidence > 0.35))
+            float confidenceThreshold = GetConfidenceThreshold();
+
+            foreach (var det in detections.Where(d => d.Confidence >= confidenceThreshold))
             {
                 var rect = new Rect(
                     det.BoundingBox.Left,
