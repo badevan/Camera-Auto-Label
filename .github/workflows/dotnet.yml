@@ -23,11 +23,11 @@ jobs:
           dotnet-version: 8.0.x
 
       - name: Restore
-        run: dotnet restore
+        run: dotnet restore "WinFormsApp1/QA_Camera_Auto_Label.csproj"
 
       - name: Publish
         run: >
-          dotnet publish
+          dotnet publish "WinFormsApp1/QA_Camera_Auto_Label.csproj"
           -c Release
           -r win-x64
           --self-contained true
@@ -35,8 +35,16 @@ jobs:
           /p:IncludeNativeLibrariesForSelfExtract=true
           -o publish
 
+      - name: Copy model files
+        shell: pwsh
+        run: |
+          if (Test-Path "WinFormsApp1\Models") {
+            New-Item -ItemType Directory -Force -Path "publish\Models" | Out-Null
+            Copy-Item "WinFormsApp1\Models\*" "publish\Models" -Recurse -Force
+          }
+
       - name: Zip output
-        run: Compress-Archive -Path publish\* -DestinationPath app.zip
+        run: Compress-Archive -Path publish\* -DestinationPath app.zip -Force
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
