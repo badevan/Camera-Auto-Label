@@ -1,15 +1,20 @@
 import sys
 import json
+import os
 from ultralytics import YOLO
 
 # ========================= CONFIG =========================
-MODEL_PATH = "yoloe-26m-seg.pt"   # Put this file in the same 'scripts' folder
+MODEL_PATH = "yoloe-26m-seg.pt"   # Must be in the same 'scripts' folder
 # =========================================================
 
-# Load model once at startup
+# Suppress as much Ultralytics output as possible
+os.environ["YOLO_VERBOSE"] = "False"
+os.environ["ULTRALYTICS_VERBOSE"] = "False"
+
 try:
-    model = YOLO(MODEL_PATH)
-    print(f"YOLOE-26m-seg model loaded successfully", file=sys.stderr)
+    # Load model quietly
+    model = YOLO(MODEL_PATH, verbose=False)
+    print("YOLOE-26m-seg model loaded successfully", file=sys.stderr)
 except Exception as e:
     print(f"Failed to load model: {e}", file=sys.stderr)
     print(json.dumps({"error": f"Failed to load model: {str(e)}"}))
@@ -19,14 +24,16 @@ except Exception as e:
 def run_detection(image_path, prompts, conf=0.25, iou=0.7):
     """Run open-vocabulary detection with YOLOE"""
     try:
+        # Set the custom classes (prompts)
         model.set_classes(prompts)
 
         results = model.predict(
             source=image_path,
             conf=conf,
             iou=iou,
-            verbose=False,
-            device="cpu"          # Change to "0" for GPU if available
+            verbose=False,      # This helps but is not enough alone
+            device="cpu",       # Change to "0" if you have GPU and want speed
+            stream=False
         )
 
         detections = []
@@ -42,7 +49,6 @@ def run_detection(image_path, prompts, conf=0.25, iou=0.7):
             cls_id = int(box.cls[0])
             label = r.names[cls_id]
             confidence = float(box.conf[0])
-
             x1, y1, x2, y2 = box.xyxy[0].tolist()
 
             detections.append({
@@ -81,15 +87,14 @@ def main():
     image_path = sys.argv[1]
     prompts_raw = sys.argv[2]
 
-    # Get confidence and iou from C# (with safe defaults)
     try:
         conf = float(sys.argv[3]) if len(sys.argv) > 3 else 0.25
         iou = float(sys.argv[4]) if len(sys.argv) > 4 else 0.7
-    except ValueError:
+    except (ValueError, IndexError):
         conf = 0.25
         iou = 0.7
 
-    # Parse prompts (comma separated)
+    # Parse prompts (comma-separated)
     prompts = [p.strip() for p in prompts_raw.split(",") if p.strip()]
 
     if not prompts:
@@ -105,6 +110,7 @@ def main():
             "Detections": detections,
             "Error": None
         }
+        # IMPORTANT: Only pure JSON on stdout
         print(json.dumps(output))
 
     except Exception as e:
